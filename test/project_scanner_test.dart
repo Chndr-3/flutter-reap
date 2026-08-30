@@ -45,4 +45,14 @@ void main() {
     makeProject(p.join('a', 'b', 'c', 'd', 'e', 'f', 'g'));
     expect(findProjects(tmp.path, maxDepth: 3), isEmpty);
   });
+
+  test('finds projects when scan root is under fvm/versions', () {
+    // Create fvm directory structure under tmp
+    final fvmPath = p.join(tmp.path, 'fvm', 'versions', '3.38.3');
+    final scanRoot = fvmPath;
+    // Create a project at the scan root (relative to scan root, nothing is inside fvm)
+    makeProject(p.join('fvm', 'versions', '3.38.3', 'myapp'));
+    final result = findProjects(scanRoot);
+    expect(result, [p.join(scanRoot, 'myapp')]);
+  });
 }

@@ -45,7 +45,7 @@ List<String> findProjects(String root, {int maxDepth = 6}) {
         if (name == 'pubspec.yaml') found.add(dir.path);
       } else if (entry is Directory) {
         if (_skipNames.contains(name)) continue;
-        if (_insideFvmVersions(entry.path)) continue;
+        if (_insideFvmVersions(entry.path, rootDepth)) continue;
         final depth = p.split(p.normalize(entry.path)).length - rootDepth;
         if (depth < maxDepth) stack.add(entry);
       }
@@ -55,8 +55,9 @@ List<String> findProjects(String root, {int maxDepth = 6}) {
   return found;
 }
 
-bool _insideFvmVersions(String dir) {
+bool _insideFvmVersions(String dir, int rootDepth) {
   final parts = p.split(dir);
-  final index = parts.indexOf('versions');
-  return index > 0 && parts[index - 1] == 'fvm';
+  final relativeParts = parts.skip(rootDepth).toList();
+  final index = relativeParts.indexOf('versions');
+  return index > 0 && relativeParts[index - 1] == 'fvm';
 }
