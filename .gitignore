@@ -1,2 +1,5 @@
 *.output
 .DS_Store
+.superpowers/
+.dart_tool/
+pubspec.lock

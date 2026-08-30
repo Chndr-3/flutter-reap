@@ -1,68 +1,101 @@
-# flutter-reap
+# flutter_reap
 
-Find Flutter build artifacts you stopped using months ago, and delete them. Dry run by default.
+Find Flutter build artifacts you stopped using months ago, and see how much
+space they're wasting. Dry run by default.
+
+## Install
 
 ```sh
-./flutter-reap                 # scan ~, show everything
-./flutter-reap ~/projects 90   # only projects untouched for 90+ days
-DELETE=1 ./flutter-reap        # open the list in $EDITOR, then remove what's left
+dart pub global activate flutter_reap
 ```
 
+## Use
+
+```sh
+flutter_reap ~              # scan home, show everything, delete nothing
+flutter_reap ~ --days 90    # only projects untouched for 90+ days
+flutter_reap ~ --delete     # list, then choose what to keep
 ```
-== projects ==
-  1840M   214d  ~/AndroidStudioProjects/old-client-app
-   920M   131d  ~/AndroidStudioProjects/side-project
-    12M     3d  ~/AndroidStudioProjects/current-work
 
-== shared caches ==
- 14204M  ~/Library/Developer/Xcode/DerivedData
-  3100M  ~/.gradle/caches
+Illustrative output — not a measured figure, just the shape of it:
 
---- reclaimable: 20076M across 9 dirs
+```
+  1. 1840M    214d  ~/AndroidStudioProjects/old-client-app
+  2.  920M    131d  ~/AndroidStudioProjects/side-project
+  3.   12M      3d  ~/AndroidStudioProjects/current-work
+  4. 14204M          ~/Library/Developer/Xcode/DerivedData
+  5.  3100M          ~/.gradle/caches
+--- 5 dirs, 20076M reclaimable
+(dry run - pass --delete to remove)
+```
+
+## Options
+
+```
+-d, --days <n>     only projects idle n+ days (default 0)
+    --delete       enter the delete flow (default is a dry run)
+    --no-caches    skip machine-wide caches
+    --json         machine-readable output, implies a dry run
+-y, --yes          delete without review; requires --days
+-h, --help
+-v, --version
 ```
 
 ## What it looks at
 
 Per project: `build/`, `.dart_tool/`, `ios/Pods`, `macos/Pods`, `android/.gradle`.
 
-Machine-wide (only on a full `~` scan): Xcode `DerivedData`, `~/.gradle/caches`,
-the CocoaPods cache, and `~/.android/cache`. Everything here regenerates on your
-next build — that's why it's safe to delete and why it grows without limit.
+Machine-wide caches and fvm SDKs are only included when the scan root is your
+home directory — narrowing the root to a subfolder of projects can't
+accidentally touch them:
 
-If you use [fvm](https://fvm.app), it also flags SDK versions **no project references**
-— roughly 1–3 GB each. Silent if you don't use fvm.
+- Xcode `DerivedData` and the CocoaPods cache (macOS)
+- `~/.gradle/caches` and `~/.android/cache` (macOS, Linux and Windows)
+
+If you use [fvm](https://fvm.app), it also flags SDK versions **no project
+references** — roughly 1–3 GB each. Silent if you don't use fvm.
 
 ## Why not just `flutter clean`
 
-`flutter clean` is one project at a time, and you have to remember which projects exist.
-`dart pub cache clean` is all-or-nothing. Neither knows that you last touched
-`old-client-app` in March.
+`flutter clean` is one project at a time, and you have to remember which
+projects exist. `dart pub cache clean` is all-or-nothing. Neither knows that
+you last touched `old-client-app` in March.
 
 ## How it decides something is stale
 
-The **last commit date** (or `pubspec.yaml` mtime for non-git projects) — not the build
-directory's own timestamp, which resets on every build and makes a two-year-dead project
-look like you touched it this morning.
+The **last commit date** for git projects, falling back to `pubspec.yaml`'s
+modification time for projects that aren't git repos — never the build
+directory's own timestamp, which resets on every build and would make a
+two-year-dead project look freshly touched.
 
 ## Safety
 
-- Dry run unless `DELETE=1`. Even then, the list opens in your `$EDITOR` first: delete a
-  line to spare that directory, quit without saving to cancel everything. Nothing is
-  removed until you save. (Same idea as `git rebase -i`, and it's why there's no TUI.)
-- Only ever removes generated directories. Never `lib/`, never `pubspec.yaml`, never source.
-- Shared caches and fvm SDKs are only touched on a full `~` scan, so narrowing the root
-  can't surprise you.
-- `./test.sh` covers all of the above, including that declining the prompt deletes nothing.
-- `~/.pub-cache` is deliberately left alone — it's shared across every project and
-  refetching it is slow. Use `dart pub cache clean` if you really want it gone.
+- Dry run unless you pass `--delete`. Even then, nothing is removed until you
+  answer the `keep which?` prompt: an empty answer deletes everything listed,
+  `k` cancels, and anything that doesn't parse also cancels rather than
+  guessing.
+- `--yes` skips that prompt, but is rejected unless you also pass `--days`.
+  Even then it only ever deletes project artifacts (`build/`, `.dart_tool/`,
+  `Pods`, `.gradle`) — machine-wide caches and fvm SDKs are never deleted
+  unattended, no matter what `--days` you pass. Reviewing those requires the
+  interactive prompt.
+- Deletion is refused for any directory whose final path segment isn't a known
+  generated name (`build`, `.dart_tool`, `Pods`, `.gradle`, `caches`, `cache`,
+  `DerivedData`, `CocoaPods`, or an fvm SDK version directory), and for
+  anything sitting directly under a filesystem root. A bug in path handling
+  cannot reach `lib/`, `pubspec.yaml`, or your source.
+- `~/.pub-cache` is never in the list of machine-wide caches this tool
+  considers on any platform (see "What it looks at" above) — it's shared
+  across every project and slow to refetch. Use `dart pub cache clean` if you
+  really want it gone.
+- `dart test` covers all of the above, including that a directory which isn't
+  a known generated name is never deleted, and that declining the prompt
+  deletes nothing.
 
-## Install
+## Platform support
 
-```sh
-git clone https://github.com/Chndr-3/flutter-reap && cd flutter-reap
-./flutter-reap
-```
+Tested in CI on Linux, macOS and Windows.
 
-Bash, no dependencies. Tested on macOS and Linux in CI. Windows isn't supported.
+## License
 
 MIT.
