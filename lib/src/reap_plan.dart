@@ -81,6 +81,8 @@ List<Candidate> buildPlan({
       ));
     }
 
+    // No size floor here, unlike the loops above: an unused SDK is a candidate
+    // by identity, not by leftover size.
     for (final sdk in fvmSdks(home: home)) {
       if (!sdk.unused) continue;
       candidates.add(Candidate(
