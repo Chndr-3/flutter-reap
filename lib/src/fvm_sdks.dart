@@ -37,19 +37,29 @@ List<FvmSdk> fvmSdks({required String home, int maxDepth = 6}) {
   final versionsDir = Directory(p.join(home, 'fvm', 'versions'));
   if (!versionsDir.existsSync()) return const [];
 
-  final installed = versionsDir
-      .listSync(followLinks: false)
-      .whereType<Directory>()
-      .toList();
+  final List<Directory> installed;
+  try {
+    installed = versionsDir
+        .listSync(followLinks: false)
+        .whereType<Directory>()
+        .toList();
+  } on FileSystemException {
+    return const [];
+  }
   if (installed.isEmpty) return const [];
 
   final configs = _findConfigs(home, maxDepth);
   return installed.map((dir) {
     final version = p.basename(dir.path);
-    final count = configs.where((text) => text.contains(version)).length;
+    final count = configs.where((text) => _mentions(text, version)).length;
     return FvmSdk(version: version, path: dir.path, referenceCount: count);
   }).toList()
     ..sort((a, b) => a.version.compareTo(b.version));
+}
+
+bool _mentions(String text, String version) {
+  final escaped = RegExp.escape(version);
+  return RegExp('(?<![\\w.])$escaped(?![\\w.])').hasMatch(text);
 }
 
 List<String> _findConfigs(String home, int maxDepth) {

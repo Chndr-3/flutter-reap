@@ -72,4 +72,44 @@ void main() {
     final sdk = fvmSdks(home: home.path).single;
     expect(sdk.unused, isTrue);
   });
+
+  test('substring matching bug: 3.4 should not match 3.4.6', () {
+    installSdk('3.4');
+    installSdk('3.4.6');
+    projectUsing('app', '3.4.6');
+
+    final sdks = fvmSdks(home: home.path);
+    final sdk34 = sdks.firstWhere((s) => s.version == '3.4');
+    final sdk346 = sdks.firstWhere((s) => s.version == '3.4.6');
+
+    expect(sdk346.unused, isFalse);
+    expect(sdk346.referenceCount, 1);
+    expect(sdk34.unused, isTrue);
+    expect(sdk34.referenceCount, 0);
+  });
+
+  test('substring matching bug: 3.38.3 should not match 3.38.30', () {
+    installSdk('3.38.3');
+    projectUsing('app', '3.38.30');
+
+    final sdk = fvmSdks(home: home.path).single;
+    expect(sdk.unused, isTrue);
+  });
+
+  test('substring matching bug: 3.4 should not match unrelated 13.4.6', () {
+    installSdk('3.4');
+    projectUsing('app', '13.4.6');
+
+    final sdk = fvmSdks(home: home.path).single;
+    expect(sdk.unused, isTrue);
+  });
+
+  test('exact match still works: 3.38.3 matches exactly 3.38.3', () {
+    installSdk('3.38.3');
+    projectUsing('app', '3.38.3');
+
+    final sdk = fvmSdks(home: home.path).single;
+    expect(sdk.unused, isFalse);
+    expect(sdk.referenceCount, 1);
+  });
 }
