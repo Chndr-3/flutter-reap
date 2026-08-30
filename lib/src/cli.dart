@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io' show Directory;
+import 'dart:io' show Directory, Platform;
 
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
@@ -115,6 +115,19 @@ CliOptions parseArgs(List<String> args) {
   );
 }
 
+/// Resolve the home directory from [environment] using the same
+/// OS-dependent precedence `shared_caches.dart` uses: on Windows,
+/// `USERPROFILE` wins over `HOME`; everywhere else, `HOME` wins over
+/// `USERPROFILE`. On Git Bash / MSYS on Windows, `HOME` (e.g. `/home/bob`)
+/// and `USERPROFILE` (e.g. `C:\Users\bob`) can both be set and disagree, and
+/// a HOME-first resolution silently omits every machine-wide cache because
+/// `rootIsHome` then fails to match the real home directory.
+String resolveHome(Map<String, String> environment, String os) {
+  return os == 'windows'
+      ? environment['USERPROFILE'] ?? environment['HOME'] ?? ''
+      : environment['HOME'] ?? environment['USERPROFILE'] ?? '';
+}
+
 /// Render [candidates] as a numbered listing.
 String renderListing(List<Candidate> candidates) {
   final buffer = StringBuffer();
@@ -182,7 +195,7 @@ int run(
     return 0;
   }
 
-  final home = environment['HOME'] ?? environment['USERPROFILE'] ?? '';
+  final home = resolveHome(environment, Platform.operatingSystem);
   final rootIsHome = home.isNotEmpty &&
       p.equals(p.normalize(p.absolute(options.root)), p.normalize(home));
 

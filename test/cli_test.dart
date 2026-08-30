@@ -72,4 +72,27 @@ void main() {
     expect(json, contains('"totalBytes": 100'));
     expect(json, contains('"/x/build"'));
   });
+
+  group('resolveHome', () {
+    final env = {'HOME': '/home/bob', 'USERPROFILE': r'C:\Users\bob'};
+
+    test('POSIX branch: HOME wins on macOS/Linux', () {
+      expect(resolveHome(env, 'macos'), '/home/bob');
+      expect(resolveHome(env, 'linux'), '/home/bob');
+    });
+
+    test('Windows branch: USERPROFILE wins, matching shared_caches.dart', () {
+      expect(resolveHome(env, 'windows'), r'C:\Users\bob');
+    });
+
+    test('falls back to the other variable when the preferred one is unset', () {
+      expect(resolveHome({'USERPROFILE': r'C:\Users\bob'}, 'macos'), r'C:\Users\bob');
+      expect(resolveHome({'HOME': '/home/bob'}, 'windows'), '/home/bob');
+    });
+
+    test('empty when neither is set', () {
+      expect(resolveHome({}, 'macos'), '');
+      expect(resolveHome({}, 'windows'), '');
+    });
+  });
 }
