@@ -1,8 +1,14 @@
 # Contributing
 
-It's one bash script. Keep it that way.
-
-- `./test.sh` must pass before and after your change. It builds a throwaway project tree in `mktemp -d` and never touches real files.
+- `dart test` must pass before and after your change. Tests build a throwaway
+  project tree in a temp directory and never touch real files.
+- `dart analyze` must be clean.
 - Anything that deletes needs a test proving it *doesn't* delete source.
-- New cache directory to sweep? Add the name to `TARGETS` in `flutter-reap`. That's the whole change — no config file, please.
-- No dependencies. Bash, `find`, `du`, `stat`, `grep`.
+- New generated directory to sweep inside a project? Add its relative path to
+  `artifactRelativePaths` in `lib/src/project_scanner.dart`. That's the whole
+  change — no config file, please.
+- New machine-wide cache? Add it to `sharedCachePaths` in
+  `lib/src/shared_caches.dart`, and add its final path segment to
+  `_deletableNames` in `lib/src/deleter.dart` so deletion isn't refused.
+- Minimal dependencies: `args` for the command line, `path` for cross-platform
+  path handling.
