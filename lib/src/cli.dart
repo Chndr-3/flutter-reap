@@ -57,7 +57,11 @@ ArgParser buildParser() => ArgParser()
   ..addFlag('delete', negatable: false, help: 'Enter the delete flow (default is a dry run).')
   ..addFlag('no-caches', negatable: false, help: 'Skip machine-wide caches.')
   ..addFlag('json', negatable: false, help: 'Machine-readable output. Implies a dry run.')
-  ..addFlag('yes', abbr: 'y', negatable: false, help: 'Delete without review. Requires --days.')
+  ..addFlag('yes',
+      abbr: 'y',
+      negatable: false,
+      help: 'Delete without review. Requires --days. Project artifacts only; '
+          'machine-wide caches are never deleted unattended.')
   ..addFlag('help', abbr: 'h', negatable: false, help: 'Show this help.')
   ..addFlag('version', abbr: 'v', negatable: false, help: 'Show the version.');
 
@@ -186,7 +190,10 @@ int run(
     root: options.root,
     home: home,
     minDays: options.minDays,
-    includeMachineWide: rootIsHome && !options.noCaches,
+    // Unattended deletes (--yes) cover project artifacts only: machine-wide
+    // caches and fvm SDKs are multi-gigabyte, slow to rebuild, and must never
+    // be removed without a human looking at the listing first.
+    includeMachineWide: !options.assumeYes && rootIsHome && !options.noCaches,
   );
 
   if (options.json) {

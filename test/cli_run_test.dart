@@ -134,6 +134,29 @@ void main() {
     expect(err.toString(), isNotEmpty);
   });
 
+  test('--yes deletes project artifacts but never machine-wide caches', () {
+    final project = makeProject(tmp, 'app', fileBytes: 2048);
+    final cacheDir = Directory(p.join(tmp.path, '.gradle', 'caches'))
+      ..createSync(recursive: true);
+    File(p.join(cacheDir.path, 'blob.bin')).writeAsBytesSync(List.filled(4096, 0));
+
+    final out = StringBuffer();
+    final err = StringBuffer();
+
+    // Scan root is HOME itself, so machine-wide caches would normally be
+    // in scope -- --yes must force them out regardless.
+    final code = runCli(
+      [tmp.path, '--delete', '--yes', '--days', '0'],
+      out: out,
+      err: err,
+      environment: {'HOME': tmp.path},
+    );
+
+    expect(code, 0);
+    expect(Directory(p.join(project.path, 'build')).existsSync(), isFalse);
+    expect(cacheDir.existsSync(), isTrue);
+  });
+
   test('a narrow scan root never surfaces machine-wide caches or fvm SDKs', () {
     // HOME (tmp) carries an fvm SDK and looks like it has shared caches, but
     // the scan root is a subdirectory of HOME, not HOME itself.
