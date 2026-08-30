@@ -9,8 +9,14 @@ now=$(date +%s)
 list=$(mktemp); trap 'rm -f "$list"' EXIT
 
 # Last time the SOURCE changed (not the build dir - that resets on every build).
-# BSD (macOS) and GNU (Linux) stat take different flags.
-mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null; }
+# BSD (macOS) and GNU (Linux) stat take different flags. Detect once: probing by
+# trying `stat -f %m` first is wrong, because GNU reads -f as --file-system and
+# prints unrelated info with exit 0 instead of failing.
+if stat --version >/dev/null 2>&1; then
+  mtime() { stat -c %Y "$1" 2>/dev/null; }   # GNU
+else
+  mtime() { stat -f %m "$1" 2>/dev/null; }   # BSD
+fi
 
 idle_days() {
   local p="$1" t
