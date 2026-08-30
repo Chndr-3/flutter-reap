@@ -117,5 +117,23 @@ void main() {
       );
       expect(plan.where((c) => c.kind == CandidateKind.fvmSdk).length, 1);
     });
+
+    test('fvm SDK candidate label includes both the version and the path', () {
+      final sdkDir = Directory(p.join(tmp.path, 'fvm', 'versions', '3.38.3'))
+        ..createSync(recursive: true);
+      final unrelated = Directory(p.join(tmp.path, 'unrelated_app'))
+        ..createSync(recursive: true);
+      File(p.join(unrelated.path, '.fvmrc')).writeAsStringSync('{"flutter": "9.9.9"}');
+
+      final plan = buildPlan(
+        root: tmp.path,
+        home: tmp.path,
+        minDays: 0,
+        includeMachineWide: true,
+      );
+      final sdkCandidate = plan.singleWhere((c) => c.kind == CandidateKind.fvmSdk);
+      expect(sdkCandidate.label, contains('3.38.3'));
+      expect(sdkCandidate.label, contains(sdkDir.path));
+    });
   });
 }

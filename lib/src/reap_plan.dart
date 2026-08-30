@@ -89,7 +89,10 @@ List<Candidate> buildPlan({
         path: sdk.path,
         bytes: directorySizeBytes(sdk.path),
         kind: CandidateKind.fvmSdk,
-        label: 'fvm ${sdk.version}',
+        // Include the path, not just the version: this is the one candidate
+        // kind whose label used to omit it, and the user is authorizing
+        // deletion of 1-3 GB without seeing which directory it is.
+        label: 'fvm ${sdk.version} (${sdk.path})',
       ));
     }
   }
