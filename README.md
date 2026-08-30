@@ -57,7 +57,7 @@ look like you touched it this morning.
 ## Install
 
 ```sh
-git clone https://github.com/YOURNAME/flutter-reap && cd flutter-reap
+git clone https://github.com/Chndr-3/flutter-reap && cd flutter-reap
 ./flutter-reap
 ```
 
