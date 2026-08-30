@@ -31,6 +31,13 @@ in (`flutter clean` is right there), or you want to clear the shared pub cache
 dart pub global activate flutter_reap
 ```
 
+> Not on pub.dev yet. Until it is, install from a clone:
+> `git clone https://github.com/Chndr-3/flutter-reap && dart pub global activate --source path flutter-reap`
+
+This puts `flutter_reap` in `~/.pub-cache/bin` (`%LOCALAPPDATA%\Pub\Cache\bin` on
+Windows). Add that to your `PATH` if it isn't already. Anyone with Flutter
+installed already has the Dart toolchain, so there is nothing else to install.
+
 ## Use
 
 ```sh
