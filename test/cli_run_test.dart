@@ -157,6 +157,32 @@ void main() {
     expect(cacheDir.existsSync(), isTrue);
   });
 
+  test('a failed delete pass returns a non-zero exit code and reports the '
+      'refusal on stderr', () {
+    final project = makeProject(tmp, 'app', fileBytes: 2048);
+    final buildDir = Directory(p.join(project.path, 'build'));
+
+    // Deleting a directory requires write permission on its *parent*, not
+    // on the directory itself. Strip write from the project dir so the
+    // deleter's attempt to remove build/ is refused by the OS.
+    Process.runSync('chmod', ['555', project.path]);
+    addTearDown(() => Process.runSync('chmod', ['755', project.path]));
+
+    final out = StringBuffer();
+    final err = StringBuffer();
+
+    final code = runCli(
+      [tmp.path, '--days', '0', '--delete'],
+      readLine: () => '',
+      out: out,
+      err: err,
+    );
+
+    expect(code, isNot(0));
+    expect(err.toString(), contains(buildDir.path));
+    expect(buildDir.existsSync(), isTrue);
+  }, testOn: '!windows');
+
   test('a narrow scan root never surfaces machine-wide caches or fvm SDKs', () {
     // HOME (tmp) carries an fvm SDK and looks like it has shared caches, but
     // the scan root is a subdirectory of HOME, not HOME itself.

@@ -257,5 +257,7 @@ int run(
     err.writeln('skipped $path: $reason');
   });
   out.writeln('deleted ${outcome.deleted.length} of ${doomed.length}');
-  return 0;
+  // A pass where every removal was refused must not look identical to
+  // success, e.g. in CI.
+  return outcome.failed.isEmpty ? 0 : 1;
 }
