@@ -44,12 +44,22 @@ check "narrow scan reports no UNUSED"   "$(grep -c 'UNUSED'        <<<"$out")" 0
 ./flutter-reap "$tmp" 0 >/dev/null 2>&1
 check "dry run keeps files" "$([ -f "$tmp/stale/build/blob.bin" ] && echo yes || echo no)" yes
 
-# DELETE=1 with 'n' must not delete
-echo n | DELETE=1 ./flutter-reap "$tmp" 0 >/dev/null 2>&1 || true
+# quitting the editor without touching the plan must not delete
+EDITOR=true DELETE=1 ./flutter-reap "$tmp" 0 >/dev/null 2>&1 || true
 check "declining keeps files" "$([ -f "$tmp/stale/build/blob.bin" ] && echo yes || echo no)" yes
 
-# DELETE=1 with 'y' removes build dirs but never source
-echo y | DELETE=1 ./flutter-reap "$tmp" 0 >/dev/null 2>&1 || true
+# removing a line from the plan keeps that directory
+EDITOR='sed -i.bak -e /Pods/d -e /^#/d' DELETE=1 ./flutter-reap "$tmp" 0 >/dev/null 2>&1 || true
+check "line removed from plan is kept" "$([ -d "$tmp/stale/ios/Pods" ] && echo yes || echo no)" yes
+check "line left in plan is deleted"   "$([ -d "$tmp/stale/build" ] && echo yes || echo no)" no
+
+# a plan emptied of paths deletes nothing new
+mkdir -p "$tmp/stale/build"; head -c 1000000 /dev/zero > "$tmp/stale/build/blob.bin"
+EDITOR='sed -i.bak -e /./d' DELETE=1 ./flutter-reap "$tmp" 0 >/dev/null 2>&1 || true
+check "emptied plan deletes nothing" "$([ -f "$tmp/stale/build/blob.bin" ] && echo yes || echo no)" yes
+
+# accepting the whole plan removes build dirs but never source
+EDITOR='sed -i.bak /^#/d' DELETE=1 ./flutter-reap "$tmp" 0 >/dev/null 2>&1 || true
 check "delete removes build"    "$([ -d "$tmp/stale/build" ] && echo yes || echo no)" no
 check "delete removes Pods"     "$([ -d "$tmp/stale/ios/Pods" ] && echo yes || echo no)" no
 check "delete keeps lib/"       "$([ -f "$tmp/stale/lib/main.dart" ] && echo yes || echo no)" yes

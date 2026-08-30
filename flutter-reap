@@ -6,7 +6,8 @@ set -uo pipefail
 ROOT="${1:-$HOME}"
 MIN_DAYS="${2:-0}"
 now=$(date +%s)
-list=$(mktemp); trap 'rm -f "$list"' EXIT
+list=$(mktemp); fvmcfg=$(mktemp); plan=$(mktemp)
+trap 'rm -f "$list" "$fvmcfg" "$plan"' EXIT
 
 # Last time the SOURCE changed (not the build dir - that resets on every build).
 # BSD (macOS) and GNU (Linux) stat take different flags. Detect once: probing by
@@ -59,7 +60,6 @@ if [ "$ROOT" = "$HOME" ]; then
   if [ -d "$HOME/fvm/versions" ]; then
     echo
     echo "== fvm sdks =="
-    fvmcfg=$(mktemp); trap 'rm -f "$list" "$fvmcfg"' EXIT
     find "$HOME" -maxdepth 6 \( -name .fvmrc -o -name fvm_config.json \) \
       -not -path '*/fvm/versions/*' -print > "$fvmcfg" 2>/dev/null
     for v in "$HOME"/fvm/versions/*/; do
@@ -83,6 +83,23 @@ echo "--- reclaimable: ${total}M across $(wc -l < "$list" | tr -d ' ') dirs"
 echo "note: ~/.pub-cache ($(mb ~/.pub-cache)M) left alone - shared, refetchable, use 'dart pub cache clean'"
 
 [[ "${DELETE:-}" == "1" ]] || { echo "(dry run - DELETE=1 to remove)"; exit 0; }
-read -rp "Delete everything listed? [y/N] " ans
-[[ "$ans" == "y" ]] || { echo aborted; exit 0; }
+[ -s "$list" ] || { echo "nothing to delete"; exit 0; }
+
+# ponytail: $EDITOR instead of a TUI - per-row control for zero lines of UI code,
+# same trick as `git rebase -i`. Delete a line to keep that directory.
+{
+  echo "# Every path below will be DELETED."
+  echo "# Remove a line to KEEP that directory. Save and quit to proceed."
+  echo "# Empty the file (or quit without saving) to cancel."
+  cat "$list"
+} > "$plan"
+before=$(md5 -q "$plan" 2>/dev/null || md5sum "$plan" | cut -d' ' -f1)
+# via sh -c so an $EDITOR carrying flags ("code -w", "subl -n") still works.
+sh -c "${EDITOR:-vi} \"\$1\"" _ "$plan" || { echo "editor failed - nothing deleted"; exit 1; }
+after=$(md5 -q "$plan" 2>/dev/null || md5sum "$plan" | cut -d' ' -f1)
+[ "$before" = "$after" ] && { echo "unchanged - nothing deleted"; exit 0; }
+
+grep -v '^#' "$plan" | grep -v '^[[:space:]]*$' > "$list" || true
+[ -s "$list" ] || { echo "nothing selected"; exit 0; }
+echo "deleting $(wc -l < "$list" | tr -d ' ') dirs..."
 while IFS= read -r d; do rm -rf "$d" && echo "rm ${d/#$HOME/~}"; done < "$list"

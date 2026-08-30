@@ -5,7 +5,7 @@ Find Flutter build artifacts you stopped using months ago, and delete them. Dry 
 ```sh
 ./flutter-reap                 # scan ~, show everything
 ./flutter-reap ~/projects 90   # only projects untouched for 90+ days
-DELETE=1 ./flutter-reap        # show the list, ask, then remove
+DELETE=1 ./flutter-reap        # open the list in $EDITOR, then remove what's left
 ```
 
 ```
@@ -46,7 +46,9 @@ look like you touched it this morning.
 
 ## Safety
 
-- Dry run unless `DELETE=1`, and even then it prints the full list and waits for `y`.
+- Dry run unless `DELETE=1`. Even then, the list opens in your `$EDITOR` first: delete a
+  line to spare that directory, quit without saving to cancel everything. Nothing is
+  removed until you save. (Same idea as `git rebase -i`, and it's why there's no TUI.)
 - Only ever removes generated directories. Never `lib/`, never `pubspec.yaml`, never source.
 - Shared caches and fvm SDKs are only touched on a full `~` scan, so narrowing the root
   can't surprise you.
