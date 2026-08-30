@@ -1,7 +1,29 @@
 # flutter_reap
 
-Find Flutter build artifacts you stopped using months ago, and see how much
-space they're wasting. Dry run by default.
+**Free up disk space from old Flutter projects.** Finds the `build/`,
+`.dart_tool/`, `ios/Pods` and `android/.gradle` directories you stopped using
+months ago — plus Xcode DerivedData, Gradle caches, and fvm SDKs no project
+references — and deletes them only after you say which to keep. Dry run by default.
+
+Think `npkill`, but for Flutter: one command across every project on the machine,
+instead of `flutter clean` one repo at a time.
+
+Works on macOS, Linux and Windows.
+
+## Is this what you're looking for?
+
+Yes, if you're asking any of these:
+
+- *How do I free up disk space taken by Flutter builds?*
+- *How do I run `flutter clean` on all my projects at once?*
+- *What's using tens of gigabytes in `~/Library/Developer/Xcode/DerivedData`?*
+- *Which of my Flutter projects still have build folders I don't need?*
+- *Which fvm SDK versions can I safely delete?*
+- *Is there an `npkill` for Flutter / Dart?*
+
+Not what you want if: you need to clean a single project you're actively working
+in (`flutter clean` is right there), or you want to clear the shared pub cache
+(`dart pub cache clean` — this tool deliberately never touches it).
 
 ## Install
 
