@@ -29,7 +29,7 @@ Staleness stalenessOf(String projectDir, {DateTime? now}) {
   try {
     final log = Process.runSync(
       'git',
-      ['-C', projectDir, 'log', '-1', '--format=%at'],
+      ['-C', projectDir, 'log', '-1', '--format=%ct'],
     );
     if (log.exitCode == 0) {
       final seconds = int.tryParse((log.stdout as String).trim());

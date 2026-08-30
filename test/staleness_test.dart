@@ -24,7 +24,8 @@ void main() {
     _git(tmp.path, ['config', 'user.email', 'test@example.com']);
     _git(tmp.path, ['config', 'user.name', 'Test']);
     _git(tmp.path, ['add', '.']);
-    _git(tmp.path, ['commit', '-qm', 'init', '--date', '2024-01-01T00:00:00']);
+    _git(tmp.path, ['commit', '-qm', 'init', '--date', '2024-01-01T00:00:00'],
+        env: {'GIT_COMMITTER_DATE': '2024-01-01T00:00:00'});
 
     // pubspec.yaml is brand new; the commit is old. The commit must win.
     final result = stalenessOf(tmp.path, now: DateTime(2024, 1, 31));
@@ -46,9 +47,31 @@ void main() {
   test('treats a missing pubspec as age zero rather than crashing', () {
     expect(stalenessOf(tmp.path, now: DateTime(2024, 1, 1)).ageDays, 0);
   });
+
+  test('uses committer date, so a rebased old commit still reads as recent', () {
+    File(p.join(tmp.path, 'pubspec.yaml')).writeAsStringSync('name: x\n');
+    _git(tmp.path, ['init', '-q']);
+    _git(tmp.path, ['config', 'user.email', 'test@example.com']);
+    _git(tmp.path, ['config', 'user.name', 'Test']);
+    _git(tmp.path, ['add', '.']);
+    // Commit with old author date but allow committer date to be current (now).
+    // This simulates a rebased commit: the original work was from 2024-01-01,
+    // but it was rebased (or cherry-picked) recently.
+    _git(tmp.path, ['commit', '-qm', 'init', '--date', '2024-01-01T00:00:00']);
+
+    // The committer date is now (or very recent), not 2024-01-01.
+    // stalenessOf should report a small age (0-1 days), proving it reads committer date.
+    final result = stalenessOf(tmp.path, now: DateTime.now());
+    expect(result.ageDays, lessThanOrEqualTo(1));
+  });
 }
 
-void _git(String dir, List<String> args) {
-  final result = Process.runSync('git', ['-C', dir, ...args]);
+void _git(String dir, List<String> args, {Map<String, String>? env}) {
+  final result = Process.runSync(
+    'git',
+    ['-C', dir, ...args],
+    environment: env,
+    includeParentEnvironment: true,
+  );
   if (result.exitCode != 0) throw StateError('git ${args.join(' ')}: ${result.stderr}');
 }
