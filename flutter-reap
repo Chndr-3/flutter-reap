@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# flutter-reap - reclaim disk from Flutter projects + shared caches.
+# Usage: flutter-reap.sh [root] [min_idle_days]    DELETE=1 to actually remove.
+set -uo pipefail
+
+ROOT="${1:-$HOME}"
+MIN_DAYS="${2:-0}"
+now=$(date +%s)
+list=$(mktemp); trap 'rm -f "$list"' EXIT
+
+# Last time the SOURCE changed (not the build dir - that resets on every build).
+idle_days() {
+  local p="$1" t
+  t=$(git -C "$p" log -1 --format=%ct 2>/dev/null) || true
+  [ -z "$t" ] && t=$(stat -f %m "$p/pubspec.yaml" 2>/dev/null || echo "$now")
+  echo $(( (now - t) / 86400 ))
+}
+mb() { du -sm "$1" 2>/dev/null | cut -f1; }
+
+echo "== projects =="
+while IFS= read -r spec; do
+  p=$(dirname "$spec")
+  case "$p" in *"/fvm/versions/"*|*"/.pub-cache/"*|*"/build/"*) continue;; esac
+  age=$(idle_days "$p"); (( age < MIN_DAYS )) && continue
+  sum=0
+  for d in build .dart_tool ios/Pods android/.gradle macos/Pods; do
+    [ -d "$p/$d" ] || continue
+    m=$(mb "$p/$d"); sum=$((sum + m))
+    echo "$p/$d" >> "$list"
+  done
+  (( sum == 0 )) && continue
+  printf '%6sM  %4sd  %s\n' "$sum" "$age" "${p/#$HOME/~}"
+done < <(find "$ROOT" -name pubspec.yaml -maxdepth 5 2>/dev/null)
+
+echo
+echo "== fvm sdks =="
+for v in ~/fvm/versions/*/; do
+  [ -d "$v" ] || continue
+  name=$(basename "$v")
+  # ponytail: always scan $HOME, not $ROOT - a narrow root would mark in-use SDKs UNUSED.
+  # plain grep over .fvmrc/fvm_config.json, no JSON parser for one field.
+  used=$(grep -rlF "$name" --include=.fvmrc --include=fvm_config.json "$HOME" 2>/dev/null | head -3)
+  if [ -z "$used" ]; then
+    printf '%6sM  UNUSED   %s\n' "$(mb "$v")" "$name"
+    echo "$v" >> "$list"
+  else
+    printf '%6sM  used by  %s (%s)\n' "$(mb "$v")" "$name" "$(echo "$used" | wc -l | tr -d ' ') project(s)"
+  fi
+done
+
+echo
+total=0
+while IFS= read -r d; do total=$((total + $(mb "$d"))); done < "$list"
+echo "--- reclaimable: ${total}M across $(wc -l < "$list" | tr -d ' ') dirs"
+echo "note: ~/.pub-cache ($(mb ~/.pub-cache)M) left alone - shared, refetchable, use 'dart pub cache clean'"
+
+[[ "${DELETE:-}" == "1" ]] || { echo "(dry run - DELETE=1 to remove)"; exit 0; }
+read -rp "Delete everything listed? [y/N] " ans
+[[ "$ans" == "y" ]] || { echo aborted; exit 0; }
+while IFS= read -r d; do rm -rf "$d" && echo "rm ${d/#$HOME/~}"; done < "$list"
