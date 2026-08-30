@@ -30,15 +30,22 @@ class DeleteOutcome {
 /// Whether [candidate] is a directory this tool may remove.
 ///
 /// The last path segment must be a known generated name, so a bug in path
-/// handling cannot reach `lib/` or `pubspec.yaml`. fvm SDK checkouts are the one
-/// exception — their directory name is a version number — and they are accepted
-/// only when they sit directly inside `fvm/versions`.
+/// handling cannot reach `lib/` or `pubspec.yaml`. Additionally, the path must
+/// have at least two segments below its root prefix (e.g., `/x/build` is allowed,
+/// but `/build` is not). fvm SDK checkouts are the one exception — their directory
+/// name is a version number — and they are accepted only when they sit directly
+/// inside `fvm/versions`.
 bool isDeletable(Candidate candidate) {
   final normalized = p.normalize(p.absolute(candidate.path));
   if (normalized == p.rootPrefix(normalized)) return false;
 
   final name = p.basename(normalized);
   if (name.isEmpty) return false;
+
+  // Ensure the path has at least two segments below the root prefix.
+  final segments = p.split(normalized);
+  final segmentsAfterRoot = segments.length - 1; // Discard the root prefix.
+  if (segmentsAfterRoot < 2) return false;
 
   if (candidate.kind == CandidateKind.fvmSdk) {
     final parts = p.split(p.dirname(normalized));

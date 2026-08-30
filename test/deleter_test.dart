@@ -82,6 +82,34 @@ void main() {
         );
       }
     });
+
+    test('refuses a projectArtifact sitting directly under a root', () {
+      expect(
+        isDeletable(_c('/build', CandidateKind.projectArtifact)),
+        isFalse,
+      );
+    });
+
+    test('refuses a sharedCache sitting directly under a root', () {
+      expect(
+        isDeletable(_c('/caches', CandidateKind.sharedCache)),
+        isFalse,
+      );
+    });
+
+    test('refuses an fvmSdk with fewer than two segments below root', () {
+      expect(
+        isDeletable(_c('/versions/3.38.3', CandidateKind.fvmSdk)),
+        isFalse,
+      );
+    });
+
+    test('allows a projectArtifact with exactly two segments below root', () {
+      expect(
+        isDeletable(_c('/x/build', CandidateKind.projectArtifact)),
+        isTrue,
+      );
+    });
   });
 
   group('deleteCandidates', () {
@@ -131,6 +159,18 @@ void main() {
     test('deleteCandidates([]) returns an empty outcome without error', () {
       final outcome = deleteCandidates([]);
       expect(outcome.deleted, isEmpty);
+      expect(outcome.failed, isEmpty);
+    });
+
+    test('real deletion inside a temp directory still succeeds end to end', () {
+      final subdir = Directory(p.join(tmp.path, 'x'))..createSync();
+      final build = Directory(p.join(subdir.path, 'build'))..createSync();
+      File(p.join(build.path, 'artifact.o')).writeAsBytesSync([1, 2, 3]);
+
+      final outcome = deleteCandidates([_c(build.path, CandidateKind.projectArtifact)]);
+
+      expect(build.existsSync(), isFalse);
+      expect(outcome.deleted, [build.path]);
       expect(outcome.failed, isEmpty);
     });
   });
