@@ -8,13 +8,19 @@ import 'package:path/path.dart' as p;
 ///
 /// The pub cache is deliberately absent on every platform: it is shared by every
 /// project and slow to refetch, and `dart pub cache clean` already covers it.
+/// `LOCALAPPDATA` is also intentionally unused: on Windows, Gradle defaults to
+/// `%USERPROFILE%\.gradle` and the Android SDK cache to `%USERPROFILE%\.android`,
+/// and the one notable cache in `%LOCALAPPDATA%\Pub\Cache` is the pub cache,
+/// which is excluded on all platforms.
 List<String> sharedCachePaths({
   required String os,
   required Map<String, String> env,
   bool Function(String path)? exists,
 }) {
   final present = exists ?? (path) => Directory(path).existsSync();
-  final home = env['HOME'] ?? env['USERPROFILE'];
+  final home = os == 'windows'
+      ? env['USERPROFILE'] ?? env['HOME']
+      : env['HOME'] ?? env['USERPROFILE'];
   if (home == null) return const [];
 
   final candidates = <String>[];

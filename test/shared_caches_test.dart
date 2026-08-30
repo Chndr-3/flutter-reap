@@ -57,4 +57,46 @@ void main() {
   test('returns nothing when the home directory is unknown', () {
     expect(sharedCachePaths(os: 'linux', env: {}, exists: always), isEmpty);
   });
+
+  test('windows with both HOME (POSIX) and USERPROFILE prefers USERPROFILE', () {
+    final paths = sharedCachePaths(
+      os: 'windows',
+      env: {
+        'HOME': '/c/Users/alice',
+        'USERPROFILE': r'C:\Users\alice',
+      },
+      exists: always,
+    );
+    // All paths should be rooted at USERPROFILE, not the POSIX-style HOME
+    expect(paths.every((path) => path.startsWith(r'C:\Users\alice')), isTrue);
+    expect(paths.any((path) => path.contains('/c/Users/alice')), isFalse);
+  });
+
+  test('windows with only HOME falls back to that', () {
+    final paths = sharedCachePaths(
+      os: 'windows',
+      env: {
+        'HOME': '/home/alice',
+      },
+      exists: always,
+    );
+    expect(paths, isNotEmpty);
+    expect(paths, contains(p.join('/home/alice', '.gradle', 'caches')));
+  });
+
+  test('posix systems with both HOME and USERPROFILE prefer HOME', () {
+    for (final os in ['macos', 'linux']) {
+      final paths = sharedCachePaths(
+        os: os,
+        env: {
+          'HOME': '/Users/alice',
+          'USERPROFILE': r'C:\Users\alice',
+        },
+        exists: always,
+      );
+      // All paths should be rooted at HOME, not USERPROFILE
+      expect(paths.every((path) => path.startsWith('/Users/alice')), isTrue,
+          reason: '$os should prefer HOME when both are set');
+    }
+  });
 }
