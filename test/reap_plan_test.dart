@@ -103,6 +103,11 @@ void main() {
 
     test('includeMachineWide true yields unused fvm SDKs', () {
       Directory(p.join(tmp.path, 'fvm', 'versions', '3.38.3')).createSync(recursive: true);
+      // An unrelated config elsewhere under home, so the scan has evidence
+      // and can conclude "unused" rather than "nothing found".
+      final unrelated = Directory(p.join(tmp.path, 'unrelated_app'))
+        ..createSync(recursive: true);
+      File(p.join(unrelated.path, '.fvmrc')).writeAsStringSync('{"flutter": "9.9.9"}');
 
       final plan = buildPlan(
         root: tmp.path,

@@ -25,6 +25,12 @@ class FvmSdk {
 
 const _configNames = {'.fvmrc', 'fvm_config.json'};
 
+/// Depth for config discovery under [home], deeper than the project scan's
+/// own default. Projects that reference an fvm SDK can live well below the
+/// typical `~/code/project` shape (e.g. `~/Documents/GitHub/org/repo/packages/app`
+/// sits at depth 6), and a config missed here reads as "nobody uses this SDK".
+const _configMaxDepth = 10;
+
 /// Installed fvm SDKs under [home], each with a count of referencing projects.
 ///
 /// Returns an empty list when fvm is not installed, which is the common case:
@@ -33,7 +39,7 @@ const _configNames = {'.fvmrc', 'fvm_config.json'};
 /// Config discovery always covers the whole of [home], never a narrower scan
 /// root. A narrow scan that reported an in-use SDK as unused would delete
 /// gigabytes of SDK somebody was using.
-List<FvmSdk> fvmSdks({required String home, int maxDepth = 6}) {
+List<FvmSdk> fvmSdks({required String home, int maxDepth = _configMaxDepth}) {
   final versionsDir = Directory(p.join(home, 'fvm', 'versions'));
   if (!versionsDir.existsSync()) return const [];
 
@@ -49,6 +55,14 @@ List<FvmSdk> fvmSdks({required String home, int maxDepth = 6}) {
   if (installed.isEmpty) return const [];
 
   final configs = _findConfigs(home, maxDepth);
+  // A scan that found zero config files anywhere under home has proven
+  // nothing about usage, not that every SDK is unused. Projects living
+  // outside `home` entirely (a different drive, a mounted volume) are the
+  // common real-world case, and reporting every installed SDK as unused in
+  // that situation is the exact multi-gigabyte disaster this module exists
+  // to prevent. Absence of evidence here is not evidence of absence.
+  if (configs.isEmpty) return const [];
+
   return installed.map((dir) {
     final version = p.basename(dir.path);
     final count = configs.where((text) => _mentions(text, version)).length;
