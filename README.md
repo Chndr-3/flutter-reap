@@ -1,5 +1,8 @@
 # flutter_reap
 
+[![pub package](https://img.shields.io/pub/v/flutter_reap.svg)](https://pub.dev/packages/flutter_reap)
+[![ci](https://github.com/Chndr-3/flutter-reap/actions/workflows/ci.yml/badge.svg)](https://github.com/Chndr-3/flutter-reap/actions)
+
 **Free up disk space from old Flutter projects.** Finds the `build/`,
 `.dart_tool/`, `ios/Pods` and `android/.gradle` directories you stopped using
 months ago — plus Xcode DerivedData, Gradle caches, and fvm SDKs no project
