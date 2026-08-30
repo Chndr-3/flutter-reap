@@ -43,6 +43,7 @@ have a dependency tree a reviewer can read in one sitting.
 | `staleness` | when did a human last touch this project? | git, else `pubspec.yaml` mtime |
 | `dir_size` | how big is this directory? | `dart:io` |
 | `shared_caches` | what machine-wide caches exist on this OS? | `Platform` |
+| `fvm_sdks` | which fvm SDKs does no project reference? | `project_scanner` |
 | `reap_plan` | what are the candidates, and what survived review? | the four above |
 | `bin/flutter_reap.dart` | parse args, print, call the plan | everything |
 
@@ -75,7 +76,15 @@ entire home directory should not be one keystroke away.
 
 ## Selection
 
-A numbered list and a prompt: `keep which? e.g. 1,3-5 / all / none`.
+A numbered list and a prompt. The answer names what to **keep**, and the wording avoids
+bare "all"/"none", which is ambiguous about which side of the line it means:
+
+```
+keep which? (e.g. 1,3-5)  [enter = keep nothing, delete all]  [k = keep everything, cancel]
+```
+
+Deleting everything therefore requires a deliberate empty answer at a prompt that has just
+listed every path, and any unparseable input cancels.
 
 Chosen over `$EDITOR` (unset on most Windows machines, awkward to test) and over a full
 TUI (raw terminal mode, an extra dependency, painful in CI). The numbered prompt behaves
@@ -110,6 +119,15 @@ Per project, the tool looks at `build/`, `.dart_tool/`, `ios/Pods`, `macos/Pods`
 Machine-wide, on a home-directory scan only: Xcode `DerivedData` and the CocoaPods cache
 (macOS), `~/.gradle/caches` (macOS and Linux), `%USERPROFILE%\.gradle\caches` and
 `%LOCALAPPDATA%\Pub\Cache` (Windows).
+
+If fvm is installed, `fvm_sdks` also reports SDK versions that no project references —
+roughly 1–3 GB each. It reads every `.fvmrc` and `fvm_config.json` under the home directory
+and matches version names against the installed SDKs. It stays silent when `~/fvm` does not
+exist, which is most users: fvm is a minority tool and must never dominate the output.
+
+Reference scanning always covers the whole home directory even when the scan root is
+narrower. A narrow scan that marked an in-use SDK as unused is exactly the bug that would
+have deleted 2.7 GB.
 
 `~/.pub-cache` is deliberately left alone. It is shared across every project and slow to
 refetch; `dart pub cache clean` already covers it.
