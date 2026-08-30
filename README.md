@@ -1,31 +1,66 @@
 # flutter-reap
 
-Reclaim disk from Flutter projects and shared caches. Dry run by default.
+Find Flutter build artifacts you stopped using months ago, and delete them. Dry run by default.
 
 ```sh
-./flutter-reap              # scan ~, show everything
-./flutter-reap ~/projects 30   # only projects idle 30+ days
-DELETE=1 ./flutter-reap        # prompt, then remove
+./flutter-reap                 # scan ~, show everything
+./flutter-reap ~/projects 90   # only projects untouched for 90+ days
+DELETE=1 ./flutter-reap        # show the list, ask, then remove
 ```
 
-Finds, per project: `build/`, `.dart_tool/`, `ios/Pods`, `android/.gradle`, `macos/Pods`.
-Staleness comes from the **last commit** (or `pubspec.yaml` mtime), not the build dir —
-build dirs reset on every build, so they always look fresh.
+```
+== projects ==
+  1840M   214d  ~/AndroidStudioProjects/old-client-app
+   920M   131d  ~/AndroidStudioProjects/side-project
+    12M     3d  ~/AndroidStudioProjects/current-work
 
-Also lists your fvm SDKs and flags any that **no project references** — usually the
-biggest single win, ~1–3 GB per orphaned SDK. Reference scanning always covers all of
-`$HOME`, even when you narrow the scan root, so an SDK used elsewhere is never marked unused.
+== shared caches ==
+ 14204M  ~/Library/Developer/Xcode/DerivedData
+  3100M  ~/.gradle/caches
 
-Leaves `~/.pub-cache` alone: it's shared and refetchable, and `dart pub cache clean` covers it.
+--- reclaimable: 20076M across 9 dirs
+```
 
-## Why
+## What it looks at
 
-`flutter clean` is per-project. `dart pub cache clean` is all-or-nothing. Neither knows
-which of your 18 projects you stopped touching a year ago, and nothing knows about fvm.
+Per project: `build/`, `.dart_tool/`, `ios/Pods`, `macos/Pods`, `android/.gradle`.
 
-## Status
+Machine-wide (only on a full `~` scan): Xcode `DerivedData`, `~/.gradle/caches`,
+the CocoaPods cache, and `~/.android/cache`. Everything here regenerates on your
+next build — that's why it's safe to delete and why it grows without limit.
 
-Bash, macOS-tested. Linux should work; Windows doesn't. A Dart port (for
-`dart pub global activate`) is the plan if people want it.
+If you use [fvm](https://fvm.app), it also flags SDK versions **no project references**
+— roughly 1–3 GB each. Silent if you don't use fvm.
+
+## Why not just `flutter clean`
+
+`flutter clean` is one project at a time, and you have to remember which projects exist.
+`dart pub cache clean` is all-or-nothing. Neither knows that you last touched
+`old-client-app` in March.
+
+## How it decides something is stale
+
+The **last commit date** (or `pubspec.yaml` mtime for non-git projects) — not the build
+directory's own timestamp, which resets on every build and makes a two-year-dead project
+look like you touched it this morning.
+
+## Safety
+
+- Dry run unless `DELETE=1`, and even then it prints the full list and waits for `y`.
+- Only ever removes generated directories. Never `lib/`, never `pubspec.yaml`, never source.
+- Shared caches and fvm SDKs are only touched on a full `~` scan, so narrowing the root
+  can't surprise you.
+- `./test.sh` covers all of the above, including that declining the prompt deletes nothing.
+- `~/.pub-cache` is deliberately left alone — it's shared across every project and
+  refetching it is slow. Use `dart pub cache clean` if you really want it gone.
+
+## Install
+
+```sh
+git clone https://github.com/YOURNAME/flutter-reap && cd flutter-reap
+./flutter-reap
+```
+
+Bash, no dependencies. Tested on macOS and Linux in CI. Windows isn't supported.
 
 MIT.

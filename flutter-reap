@@ -9,10 +9,13 @@ now=$(date +%s)
 list=$(mktemp); trap 'rm -f "$list"' EXIT
 
 # Last time the SOURCE changed (not the build dir - that resets on every build).
+# BSD (macOS) and GNU (Linux) stat take different flags.
+mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null; }
+
 idle_days() {
   local p="$1" t
   t=$(git -C "$p" log -1 --format=%ct 2>/dev/null) || true
-  [ -z "$t" ] && t=$(stat -f %m "$p/pubspec.yaml" 2>/dev/null || echo "$now")
+  [ -z "$t" ] && t=$(mtime "$p/pubspec.yaml"); [ -z "$t" ] && t="$now"
   echo $(( (now - t) / 86400 ))
 }
 mb() { du -sm "$1" 2>/dev/null | cut -f1; }
@@ -32,21 +35,40 @@ while IFS= read -r spec; do
   printf '%6sM  %4sd  %s\n' "$sum" "$age" "${p/#$HOME/~}"
 done < <(find "$ROOT" -name pubspec.yaml -maxdepth 5 2>/dev/null)
 
-echo
-echo "== fvm sdks =="
-for v in ~/fvm/versions/*/; do
-  [ -d "$v" ] || continue
-  name=$(basename "$v")
-  # ponytail: always scan $HOME, not $ROOT - a narrow root would mark in-use SDKs UNUSED.
-  # plain grep over .fvmrc/fvm_config.json, no JSON parser for one field.
-  used=$(grep -rlF "$name" --include=.fvmrc --include=fvm_config.json "$HOME" 2>/dev/null | head -3)
-  if [ -z "$used" ]; then
-    printf '%6sM  UNUSED   %s\n' "$(mb "$v")" "$name"
-    echo "$v" >> "$list"
-  else
-    printf '%6sM  used by  %s (%s)\n' "$(mb "$v")" "$name" "$(echo "$used" | wc -l | tr -d ' ') project(s)"
+# Shared caches and fvm are machine-wide, so they're only offered when scanning all
+# of $HOME. Narrow scans stay scoped to what you asked for.
+if [ "$ROOT" = "$HOME" ]; then
+  echo
+  echo "== shared caches =="
+  for c in ~/Library/Developer/Xcode/DerivedData ~/.gradle/caches \
+           ~/Library/Caches/CocoaPods ~/.android/cache; do
+    [ -d "$c" ] || continue
+    m=$(mb "$c"); (( m < 1 )) && continue
+    printf '%6sM  %s\n' "$m" "${c/#$HOME/~}"
+    echo "$c" >> "$list"
+  done
+
+  # ponytail: locate the few config files once, then grep those - a recursive
+  # content grep over all of $HOME took minutes.
+  if [ -d "$HOME/fvm/versions" ]; then
+    echo
+    echo "== fvm sdks =="
+    fvmcfg=$(mktemp); trap 'rm -f "$list" "$fvmcfg"' EXIT
+    find "$HOME" -maxdepth 6 \( -name .fvmrc -o -name fvm_config.json \) \
+      -not -path '*/fvm/versions/*' -print > "$fvmcfg" 2>/dev/null
+    for v in "$HOME"/fvm/versions/*/; do
+      [ -d "$v" ] || continue
+      name=$(basename "$v")
+      used=$(xargs -0 grep -lF "$name" < <(tr '\n' '\0' < "$fvmcfg") 2>/dev/null)
+      if [ -z "$used" ]; then
+        printf '%6sM  UNUSED   %s\n' "$(mb "$v")" "$name"
+        echo "$v" >> "$list"
+      else
+        printf '%6sM  used by  %s (%s project(s))\n' "$(mb "$v")" "$name" "$(echo "$used" | wc -l | tr -d ' ')"
+      fi
+    done
   fi
-done
+fi
 
 echo
 total=0
