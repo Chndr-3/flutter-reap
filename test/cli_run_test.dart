@@ -217,6 +217,53 @@ void main() {
     expect(Directory(p.join(small.path, 'build')).existsSync(), isFalse);
   });
 
+  test('--json writes no progress text to stderr, and stdout still parses '
+      'as JSON', () {
+    makeProject(tmp, 'app', fileBytes: 2048);
+    final out = StringBuffer();
+    final err = StringBuffer();
+
+    final code = runCli([tmp.path, '--days', '0', '--json'], out: out, err: err);
+
+    expect(code, 0);
+    expect(err.toString(), isEmpty);
+    final decoded = jsonDecode(out.toString());
+    expect(decoded, isA<Map<String, dynamic>>());
+  });
+
+  test('a normal dry run writes progress to stderr while the listing goes '
+      'to stdout', () {
+    final project = makeProject(tmp, 'app', fileBytes: 2048);
+    final out = StringBuffer();
+    final err = StringBuffer();
+
+    final code = runCli([tmp.path, '--days', '0'], out: out, err: err);
+
+    expect(code, 0);
+    final buildPath = p.join(project.path, 'build');
+    expect(out.toString(), contains(buildPath));
+    expect(err.toString(), isNotEmpty);
+    expect(err.toString(), isNot(contains(buildPath)));
+  });
+
+  test('showProgress: false suppresses progress even outside --json', () {
+    makeProject(tmp, 'app', fileBytes: 2048);
+    final out = StringBuffer();
+    final err = StringBuffer();
+
+    final code = run(
+      [tmp.path, '--days', '0'],
+      readLine: () => _eofSentinel,
+      out: out,
+      err: err,
+      environment: {'HOME': tmp.path},
+      showProgress: false,
+    );
+
+    expect(code, 0);
+    expect(err.toString(), isEmpty);
+  });
+
   test('a narrow scan root never surfaces machine-wide caches or fvm SDKs', () {
     // HOME (tmp) carries an fvm SDK and looks like it has shared caches, but
     // the scan root is a subdirectory of HOME, not HOME itself.

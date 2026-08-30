@@ -118,6 +118,36 @@ void main() {
       expect(plan.where((c) => c.kind == CandidateKind.fvmSdk).length, 1);
     });
 
+    test('onProgress is invoked at least once while scanning a project', () {
+      makeProject('app', fileBytes: 2048);
+      final messages = <String>[];
+
+      final plan = buildPlan(
+        root: tmp.path,
+        home: tmp.path,
+        minDays: 0,
+        includeMachineWide: false,
+        onProgress: messages.add,
+      );
+
+      expect(plan.single.path, p.join(tmp.path, 'app', 'build'));
+      expect(messages, isNotEmpty);
+    });
+
+    test('omitting onProgress behaves identically to passing it', () {
+      makeProject('app', fileBytes: 2048);
+
+      final plan = buildPlan(
+        root: tmp.path,
+        home: tmp.path,
+        minDays: 0,
+        includeMachineWide: false,
+      );
+
+      expect(plan.single.path, p.join(tmp.path, 'app', 'build'));
+      expect(plan.single.bytes, 2048);
+    });
+
     test('fvm SDK candidate label includes both the version and the path', () {
       final sdkDir = Directory(p.join(tmp.path, 'fvm', 'versions', '3.38.3'))
         ..createSync(recursive: true);

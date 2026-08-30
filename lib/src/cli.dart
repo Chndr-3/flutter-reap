@@ -10,7 +10,7 @@ import 'reap_plan.dart';
 import 'selection.dart';
 
 /// The version reported by `--version`. Keep in step with `pubspec.yaml`.
-const String packageVersion = '0.1.0';
+const String packageVersion = '0.1.1';
 
 /// Parsed command line options.
 class CliOptions {
@@ -168,12 +168,21 @@ String renderJson(List<Candidate> candidates) {
 /// rather than deleting), [out]/[err] stand in for stdout/stderr, and
 /// [environment] stands in for `Platform.environment` so a test can point
 /// HOME at a temp directory instead of the real machine.
+/// [showProgress] decides whether scan progress is written to [err] at all.
+///
+/// Real usage (`bin/flutter_reap.dart`) passes `stderr.hasTerminal` here
+/// rather than `run` reading it directly, so a piped or CI stderr never
+/// fills with carriage-returned status lines, and so tests — which never run
+/// attached to a terminal — can still exercise the progress path by passing
+/// `true` explicitly. `--json` always suppresses progress regardless of this
+/// flag, since machine-readable mode must be silent apart from the JSON.
 int run(
   List<String> args, {
   required String Function() readLine,
   required StringSink out,
   required StringSink err,
   required Map<String, String> environment,
+  bool showProgress = true,
 }) {
   final CliOptions options;
   try {
@@ -199,6 +208,17 @@ int run(
   final rootIsHome = home.isNotEmpty &&
       p.equals(p.normalize(p.absolute(options.root)), p.normalize(home));
 
+  // Machine-readable mode must stay silent apart from the JSON, so progress
+  // is suppressed there even when showProgress is true.
+  final reportProgress = showProgress && !options.json;
+  var lastProgressLength = 0;
+  void onProgress(String message) {
+    // \r plus overwriting with spaces erases the previous line rather than
+    // leaving stray trailing characters when a later message is shorter.
+    err.write('\r${' ' * lastProgressLength}\r$message');
+    lastProgressLength = message.length;
+  }
+
   final candidates = buildPlan(
     root: options.root,
     home: home,
@@ -207,7 +227,14 @@ int run(
     // caches and fvm SDKs are multi-gigabyte, slow to rebuild, and must never
     // be removed without a human looking at the listing first.
     includeMachineWide: !options.assumeYes && rootIsHome && !options.noCaches,
+    onProgress: reportProgress ? onProgress : null,
   );
+
+  // Clear any in-progress status line before the real output, so the final
+  // listing (or JSON) never has a half-written progress line above it.
+  if (reportProgress && lastProgressLength > 0) {
+    err.write('\r${' ' * lastProgressLength}\r');
+  }
 
   if (options.json) {
     out.writeln(renderJson(candidates));

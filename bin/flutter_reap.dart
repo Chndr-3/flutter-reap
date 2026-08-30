@@ -9,6 +9,9 @@ void main(List<String> args) {
     out: stdout,
     err: stderr,
     environment: Platform.environment,
+    // Only draw the carriage-returned progress line when stderr is an actual
+    // terminal, so a piped stderr (CI logs, `2> file`) stays clean.
+    showProgress: stderr.hasTerminal,
   );
   if (code != 0) exit(code);
 }

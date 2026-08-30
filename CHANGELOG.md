@@ -1,3 +1,15 @@
+## 0.1.1
+
+- Prints scan progress to stderr while a run is in flight, so a scan of a
+  large tree (or a home-directory scan sizing gigabytes of Xcode
+  DerivedData) no longer sits silent for tens of seconds before dumping the
+  finished listing.
+- Progress is suppressed for `--json` and whenever stderr is not a
+  terminal, so `--json` stays machine-readable and CI logs and redirected
+  stderr stay clean.
+- stdout is untouched: the listing and `--json` output are exactly as
+  before, so piping into `jq` or a file keeps working.
+
 ## 0.1.0
 
 First release.
