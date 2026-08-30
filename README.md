@@ -74,16 +74,20 @@ two-year-dead project look freshly touched.
   answer the `keep which?` prompt: an empty answer deletes everything listed,
   `k` cancels, and anything that doesn't parse also cancels rather than
   guessing.
-- `--yes` skips that prompt, but is rejected unless you also pass `--days`, so
-  an unfiltered delete-everything is never one keystroke away.
+- `--yes` skips that prompt, but is rejected unless you also pass `--days`.
+  Even then it only ever deletes project artifacts (`build/`, `.dart_tool/`,
+  `Pods`, `.gradle`) — machine-wide caches and fvm SDKs are never deleted
+  unattended, no matter what `--days` you pass. Reviewing those requires the
+  interactive prompt.
 - Deletion is refused for any directory whose final path segment isn't a known
   generated name (`build`, `.dart_tool`, `Pods`, `.gradle`, `caches`, `cache`,
   `DerivedData`, `CocoaPods`, or an fvm SDK version directory), and for
   anything sitting directly under a filesystem root. A bug in path handling
   cannot reach `lib/`, `pubspec.yaml`, or your source.
-- `~/.pub-cache` is never touched, on any platform — it's shared across every
-  project and slow to refetch. Use `dart pub cache clean` if you really want
-  it gone.
+- `~/.pub-cache` is never in the list of machine-wide caches this tool
+  considers on any platform (see "What it looks at" above) — it's shared
+  across every project and slow to refetch. Use `dart pub cache clean` if you
+  really want it gone.
 - `dart test` covers all of the above, including that a directory which isn't
   a known generated name is never deleted, and that declining the prompt
   deletes nothing.
