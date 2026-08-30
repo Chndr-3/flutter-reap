@@ -31,6 +31,7 @@ class Candidate {
   /// Whether the owning project has uncommitted changes.
   final bool dirty;
 
+  /// Creates a candidate for deletion.
   const Candidate({
     required this.path,
     required this.bytes,
