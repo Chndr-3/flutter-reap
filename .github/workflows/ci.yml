@@ -8,5 +8,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - run: shellcheck flutter-reap test.sh
+      - run: shellcheck flutter-reap test.sh   # preinstalled on the Linux runner only
+        if: matrix.os == 'ubuntu-latest'
       - run: ./test.sh
