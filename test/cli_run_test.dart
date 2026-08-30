@@ -183,6 +183,40 @@ void main() {
     expect(buildDir.existsSync(), isTrue);
   }, testOn: '!windows');
 
+  test('the number printed beside a path is the number that keeps it', () {
+    // Two candidates of clearly different sizes, so a 0-based renderListing
+    // would still parse but would answer with the wrong index -- keeping (or
+    // deleting) the wrong directory. This is the one test that would catch
+    // an off-by-one between what the user is shown and what is kept.
+    final small = makeProject(tmp, 'small_app', fileBytes: 2048);
+    final big = makeProject(tmp, 'big_app', fileBytes: 200000);
+    final out = StringBuffer();
+    final err = StringBuffer();
+
+    final code = runCli([tmp.path, '--days', '0'], out: out, err: err);
+    expect(code, 0);
+
+    final listing = out.toString();
+    final bigBuildPath = p.join(big.path, 'build');
+    final lineForBig = listing
+        .split('\n')
+        .firstWhere((line) => line.contains(bigBuildPath));
+    final numberForBig = int.parse(lineForBig.trim().split('.').first);
+
+    final deleteOut = StringBuffer();
+    final deleteErr = StringBuffer();
+    final deleteCode = runCli(
+      [tmp.path, '--days', '0', '--delete'],
+      readLine: () => '$numberForBig',
+      out: deleteOut,
+      err: deleteErr,
+    );
+
+    expect(deleteCode, 0);
+    expect(Directory(bigBuildPath).existsSync(), isTrue);
+    expect(Directory(p.join(small.path, 'build')).existsSync(), isFalse);
+  });
+
   test('a narrow scan root never surfaces machine-wide caches or fvm SDKs', () {
     // HOME (tmp) carries an fvm SDK and looks like it has shared caches, but
     // the scan root is a subdirectory of HOME, not HOME itself.
