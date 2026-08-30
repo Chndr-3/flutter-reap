@@ -1,10 +1,13 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' show Directory;
 
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 
 import 'candidate.dart';
+import 'deleter.dart';
+import 'reap_plan.dart';
+import 'selection.dart';
 
 /// The version reported by `--version`. Keep in step with `pubspec.yaml`.
 const String packageVersion = '0.1.0';
@@ -137,4 +140,102 @@ String renderJson(List<Candidate> candidates) {
     'totalBytes': candidates.fold<int>(0, (sum, c) => sum + c.bytes),
     'candidates': entries.toList(),
   });
+}
+
+/// Runs the CLI end to end and returns the process exit code.
+///
+/// This is the whole of `main()`'s decision logic, pulled out so it can be
+/// exercised without a real process: [readLine] stands in for reading the
+/// keep/delete prompt (a caller simulating EOF should return the same
+/// sentinel `stdin.readLineSync() ?? 'k'` produces, which already cancels
+/// rather than deleting), [out]/[err] stand in for stdout/stderr, and
+/// [environment] stands in for `Platform.environment` so a test can point
+/// HOME at a temp directory instead of the real machine.
+int run(
+  List<String> args, {
+  required String Function() readLine,
+  required StringSink out,
+  required StringSink err,
+  required Map<String, String> environment,
+}) {
+  final CliOptions options;
+  try {
+    options = parseArgs(args);
+  } on FormatException catch (e) {
+    err.writeln(e.message);
+    err.writeln('');
+    err.writeln(buildParser().usage);
+    return 64; // EX_USAGE
+  }
+
+  if (options.help) {
+    out.writeln('flutter_reap [path] [options]\n');
+    out.writeln(buildParser().usage);
+    return 0;
+  }
+  if (options.version) {
+    out.writeln(packageVersion);
+    return 0;
+  }
+
+  final home = environment['HOME'] ?? environment['USERPROFILE'] ?? '';
+  final rootIsHome = home.isNotEmpty &&
+      p.equals(p.normalize(p.absolute(options.root)), p.normalize(home));
+
+  final candidates = buildPlan(
+    root: options.root,
+    home: home,
+    minDays: options.minDays,
+    includeMachineWide: rootIsHome && !options.noCaches,
+  );
+
+  if (options.json) {
+    out.writeln(renderJson(candidates));
+    return 0;
+  }
+
+  if (candidates.isEmpty) {
+    out.writeln('Nothing to reclaim.');
+    return 0;
+  }
+
+  out.write(renderListing(candidates));
+  final totalMb = candidates.fold<int>(0, (sum, c) => sum + c.bytes) ~/ (1024 * 1024);
+  out.writeln('--- ${candidates.length} dirs, ${totalMb}M reclaimable');
+
+  if (!options.delete) {
+    out.writeln('(dry run - pass --delete to remove)');
+    return 0;
+  }
+
+  final Selection selection;
+  if (options.assumeYes) {
+    selection = const KeepIndexes({});
+  } else {
+    out.write(
+      'keep which? (e.g. 1,3-5)  [enter = keep nothing, delete all]  [k = keep everything, cancel] ',
+    );
+    selection = parseSelection(readLine(), candidates.length);
+  }
+
+  if (selection is CancelSelection) {
+    out.writeln('cancelled - nothing deleted');
+    return 0;
+  }
+
+  final doomed = survivors(candidates, (selection as KeepIndexes).indexes);
+  if (doomed.isEmpty) {
+    out.writeln('nothing selected');
+    return 0;
+  }
+
+  final outcome = deleteCandidates(doomed);
+  for (final path in outcome.deleted) {
+    out.writeln('rm $path');
+  }
+  outcome.failed.forEach((path, reason) {
+    err.writeln('skipped $path: $reason');
+  });
+  out.writeln('deleted ${outcome.deleted.length} of ${doomed.length}');
+  return 0;
 }
