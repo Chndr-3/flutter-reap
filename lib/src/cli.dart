@@ -10,7 +10,7 @@ import 'reap_plan.dart';
 import 'selection.dart';
 
 /// The version reported by `--version`. Keep in step with `pubspec.yaml`.
-const String packageVersion = '0.1.1';
+const String packageVersion = '0.2.0';
 
 /// Parsed command line options.
 class CliOptions {

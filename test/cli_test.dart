@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:test/test.dart';
 import 'package:flutter_reap/src/cli.dart';
 import 'package:flutter_reap/src/candidate.dart';
@@ -94,5 +96,15 @@ void main() {
       expect(resolveHome({}, 'macos'), '');
       expect(resolveHome({}, 'windows'), '');
     });
+  });
+
+  test('packageVersion matches the version in pubspec.yaml', () {
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    final declared = RegExp(r'^version:\s*(\S+)', multiLine: true)
+        .firstMatch(pubspec)
+        ?.group(1);
+
+    expect(declared, isNotNull, reason: 'pubspec.yaml has no version: line');
+    expect(packageVersion, declared);
   });
 }

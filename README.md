@@ -58,6 +58,14 @@ Illustrative output — not a measured figure, just the shape of it:
 (dry run - pass --delete to remove)
 ```
 
+Columns are size, days since the project was last touched, then the path. A `!`
+after the age means the project has uncommitted changes — the build artifacts
+are still safe to delete, it just tells you someone was mid-work there.
+
+Sizes are disk usage — the blocks actually allocated — so they match what `df`
+gives back after a delete, and content that is hardlinked in several places is
+counted once.
+
 ## Options
 
 ```
@@ -83,6 +91,9 @@ accidentally touch them:
 
 If you use [fvm](https://fvm.app), it also flags SDK versions **no project
 references** — roughly 1–3 GB each. Silent if you don't use fvm.
+
+The SDK selected with `fvm global` is never offered for deletion, even though
+`fvm global` writes no project config naming it.
 
 ## Why not just `flutter clean`
 

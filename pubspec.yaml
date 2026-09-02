@@ -1,6 +1,6 @@
 name: flutter_reap
 description: Find and delete Flutter build artifacts you stopped using months ago. Dry run by default.
-version: 0.1.1
+version: 0.2.0
 repository: https://github.com/Chndr-3/flutter-reap
 topics: [flutter, cli, cache, cleanup, devtools]
 
