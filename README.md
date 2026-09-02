@@ -62,9 +62,11 @@ Columns are size, days since the project was last touched, then the path. A `!`
 after the age means the project has uncommitted changes — the build artifacts
 are still safe to delete, it just tells you someone was mid-work there.
 
-Sizes are disk usage — the blocks actually allocated — so they match what `df`
-gives back after a delete, and content that is hardlinked in several places is
-counted once.
+Sizes are disk usage — the blocks actually allocated — so a single entry
+matches what `df` gives back after deleting just that directory. The total is
+not the same guarantee: each candidate is sized by its own `du` run, so
+content hardlinked across two candidates is counted once in each and adds
+twice to the total.
 
 ## Options
 

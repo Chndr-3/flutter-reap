@@ -57,7 +57,7 @@ int walkSizeBytes(String path) {
 int? duSizeBytes(String path) {
   final ProcessResult result;
   try {
-    result = Process.runSync('du', ['-sk', path]);
+    result = Process.runSync('du', ['-sk', '--', path]);
   } catch (e) {
     return null; // du missing or unspawnable
   }
@@ -68,11 +68,19 @@ int? duSizeBytes(String path) {
 
 /// Size on disk in bytes of everything under [path], or 0 if it is missing.
 ///
-/// Prefers `du`, which is several times faster than walking every file from
-/// Dart on the large trees this tool exists for, and falls back to
-/// [walkSizeBytes] on Windows or whenever `du` cannot answer. The two disagree
-/// slightly — `du` reports allocated blocks, the walk reports apparent size —
-/// and `du`'s answer is the one the tool means by "reclaimable".
+/// Prefers `du`, falling back to [walkSizeBytes] on Windows or whenever `du`
+/// cannot answer. Each `du` call pays a fixed process-spawn cost — roughly
+/// 8.8ms on macOS/APFS against roughly 0.04ms for the walk on a trivial
+/// directory — so `du` loses on small trees (measured: 8 entries, walk 0ms,
+/// du 25ms) and wins on large ones (measured: 11,670 entries, walk 207ms, du
+/// 170ms; 84,501 entries, walk 2782ms, du 1135ms). The large trees are what
+/// dominate a scan's wall clock — a home-directory scan spends most of its
+/// time sizing Xcode DerivedData — so `du` is the better default despite
+/// losing on the small cases.
+///
+/// The two also disagree slightly on the number itself — `du` reports
+/// allocated blocks, the walk reports apparent size — and `du`'s answer is
+/// the one the tool means by "reclaimable".
 ///
 /// [du] is injected only so the fallback branch can be tested: on a machine
 /// that has `du`, nothing else ever takes it, which makes it the branch most
@@ -85,5 +93,14 @@ int directorySizeBytes(
   // projects have no macos/Pods) and must not cost a process.
   if (!Directory(path).existsSync()) return 0;
   if (Platform.isWindows) return walkSizeBytes(path);
-  return du(path) ?? walkSizeBytes(path);
+  // A 0 from du is not trusted on its own: du -sk does not follow a symlink
+  // given directly as its argument, so a candidate that is itself a symlink
+  // (a DerivedData or build/ directory relinked onto another volume) reads as
+  // an empty tree and would otherwise vanish from the plan. Falling back to
+  // the walk here costs one extra walk on a genuinely empty directory, which
+  // also returns 0, so the fallback is free in the common case.
+  final duResult = du(path);
+  if (duResult == null) return walkSizeBytes(path);
+  if (duResult == 0) return walkSizeBytes(path);
+  return duResult;
 }

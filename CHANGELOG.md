@@ -9,9 +9,12 @@
   answer. A home-directory scan spends most of its time sizing Xcode
   DerivedData, and that is the part this speeds up.
 - Changed: reported sizes are now disk usage — the blocks actually allocated —
-  rather than the sum of file lengths. Figures shift slightly upward for trees
-  of many small files, hardlinked content counts once, and the number now
-  matches what `df` gives back after a delete.
+  rather than the sum of file lengths. Figures shift in either direction:
+  upward for trees of many small files, but downward — sometimes well below
+  apparent size — for trees affected by APFS transparent compression or
+  sparse files, which includes exactly the DerivedData trees this targets.
+  Hardlinked content counts once, and the number now matches what `df` gives
+  back after a delete.
 
 ## 0.1.1
 

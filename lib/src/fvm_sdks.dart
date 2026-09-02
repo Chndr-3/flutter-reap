@@ -136,8 +136,11 @@ bool _insideFvmVersions(String dir, int rootDepth) {
 /// `fvm global <version>` records its choice only as this symlink — no config
 /// file is written anywhere — so this read is the only way to learn the global
 /// version without the `fvm` executable, which is frequently not on PATH.
-/// A missing link, a plain directory of that name, or an unreadable link all
-/// yield null, which leaves the SDK to be judged by config references alone.
+/// A missing link or a plain directory of that name both mean there is no
+/// global SDK to protect, which is safe. An unreadable link is not: if
+/// `targetSync()` throws, this also returns null, and the SDK it points at
+/// goes back to being judged by config references alone — the one remaining
+/// path back to the original bug of reporting an in-use global SDK as unused.
 String? _globalSdkVersion(String home) {
   final link = p.join(home, 'fvm', 'default');
   if (!FileSystemEntity.isLinkSync(link)) return null;

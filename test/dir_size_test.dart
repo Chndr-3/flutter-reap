@@ -85,6 +85,20 @@ void main() {
     expect(directorySizeBytes(p.join(tmp.path, 'nope')), 0);
   });
 
+  test('directorySizeBytes follows a symlink given directly as the path', () {
+    // du -sk <symlink> does not follow a symlink passed as its own argument,
+    // so a candidate directory that is itself a symlink (a DerivedData or
+    // build/ relinked onto another volume) would size as 0 and vanish from
+    // the plan without the walk fallback this guards.
+    final target = Directory.systemTemp.createTempSync('reap_link_target_');
+    File(p.join(target.path, 'a.bin'))..createSync()..writeAsBytesSync(List.filled(1000, 0));
+    final link = p.join(tmp.path, 'link');
+    Link(link).createSync(target.path);
+
+    expect(directorySizeBytes(link), greaterThan(0));
+    target.deleteSync(recursive: true);
+  }, skip: Platform.isWindows ? 'symlink creation requires privileges on Windows' : null);
+
   test('walkSizeBytes does not follow symlinks out of the tree', () {
     final outside = Directory.systemTemp.createTempSync('reap_outside_');
     File(p.join(outside.path, 'big.bin'))..createSync()..writeAsBytesSync(List.filled(9999, 0));
