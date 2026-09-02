@@ -9,12 +9,12 @@ void main() {
   setUp(() => tmp = Directory.systemTemp.createTempSync('reap_size_'));
   tearDown(() => tmp.deleteSync(recursive: true));
 
-  test('sums file sizes recursively', () {
+  test('walkSizeBytes sums apparent file sizes recursively', () {
     File(p.join(tmp.path, 'a.bin'))..createSync()..writeAsBytesSync(List.filled(1000, 0));
     Directory(p.join(tmp.path, 'nested')).createSync();
     File(p.join(tmp.path, 'nested', 'b.bin'))..createSync()..writeAsBytesSync(List.filled(500, 0));
 
-    expect(directorySizeBytes(tmp.path), 1500);
+    expect(walkSizeBytes(tmp.path), 1500);
   });
 
   test('returns zero for a directory that does not exist', () {
