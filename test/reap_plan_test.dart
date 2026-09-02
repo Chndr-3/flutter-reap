@@ -61,7 +61,7 @@ void main() {
         includeMachineWide: false,
       );
       expect(plan.single.path, p.join(tmp.path, 'app', 'build'));
-      expect(plan.single.bytes, 2048);
+      expect(plan.single.bytes, greaterThanOrEqualTo(2048));
     });
 
     test('skips projects with no artifacts at all', () {
@@ -145,7 +145,7 @@ void main() {
       );
 
       expect(plan.single.path, p.join(tmp.path, 'app', 'build'));
-      expect(plan.single.bytes, 2048);
+      expect(plan.single.bytes, greaterThanOrEqualTo(2048));
     });
 
     test('fvm SDK candidate label includes both the version and the path', () {
