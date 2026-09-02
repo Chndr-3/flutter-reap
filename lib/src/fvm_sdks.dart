@@ -12,15 +12,22 @@ class FvmSdk {
   /// Number of project configs naming this version.
   final int referenceCount;
 
+  /// Whether `~/fvm/default` points at this SDK, i.e. `fvm global` selected it.
+  final bool isGlobalDefault;
+
   /// Creates an fvm SDK entry with version, path, and reference count.
   const FvmSdk({
     required this.version,
     required this.path,
     required this.referenceCount,
+    this.isGlobalDefault = false,
   });
 
-  /// Whether no project references this SDK, making it safe to remove.
-  bool get unused => referenceCount == 0;
+  /// Whether nothing references this SDK, making it safe to remove.
+  ///
+  /// The global default counts as a reference even though `fvm global` writes
+  /// no project config: it is what a bare `flutter` command resolves through.
+  bool get unused => referenceCount == 0 && !isGlobalDefault;
 }
 
 const _configNames = {'.fvmrc', 'fvm_config.json'};
@@ -54,6 +61,8 @@ List<FvmSdk> fvmSdks({required String home, int maxDepth = _configMaxDepth}) {
   }
   if (installed.isEmpty) return const [];
 
+  final globalVersion = _globalSdkVersion(home);
+
   final configs = _findConfigs(home, maxDepth);
   // A scan that found zero config files anywhere under home has proven
   // nothing about usage, not that every SDK is unused. Projects living
@@ -66,7 +75,12 @@ List<FvmSdk> fvmSdks({required String home, int maxDepth = _configMaxDepth}) {
   return installed.map((dir) {
     final version = p.basename(dir.path);
     final count = configs.where((text) => _mentions(text, version)).length;
-    return FvmSdk(version: version, path: dir.path, referenceCount: count);
+    return FvmSdk(
+      version: version,
+      path: dir.path,
+      referenceCount: count,
+      isGlobalDefault: version == globalVersion,
+    );
   }).toList()
     ..sort((a, b) => a.version.compareTo(b.version));
 }
@@ -115,4 +129,24 @@ bool _insideFvmVersions(String dir, int rootDepth) {
   final relativeParts = parts.skip(rootDepth).toList();
   final index = relativeParts.indexOf('versions');
   return index > 0 && relativeParts[index - 1] == 'fvm';
+}
+
+/// The version `~/fvm/default` points at, or null when there is no global SDK.
+///
+/// `fvm global <version>` records its choice only as this symlink — no config
+/// file is written anywhere — so this read is the only way to learn the global
+/// version without the `fvm` executable, which is frequently not on PATH.
+/// A missing link or a plain directory of that name both mean there is no
+/// global SDK to protect, which is safe. An unreadable link is not: if
+/// `targetSync()` throws, this also returns null, and the SDK it points at
+/// goes back to being judged by config references alone — the one remaining
+/// path back to the original bug of reporting an in-use global SDK as unused.
+String? _globalSdkVersion(String home) {
+  final link = p.join(home, 'fvm', 'default');
+  if (!FileSystemEntity.isLinkSync(link)) return null;
+  try {
+    return p.basename(Link(link).targetSync());
+  } on FileSystemException {
+    return null;
+  }
 }

@@ -1,3 +1,21 @@
+## 0.2.0
+
+- Fixed: an SDK selected with `fvm global` is no longer offered for deletion.
+  fvm records that choice only as the `~/fvm/default` symlink and writes no
+  project config, so the previous reference count read it as unused — and
+  offered to delete the SDK a bare `flutter` command resolves through.
+- Faster: directory sizing now shells out to `du` where it is available,
+  falling back to the previous Dart walk on Windows and whenever `du` cannot
+  answer. A home-directory scan spends most of its time sizing Xcode
+  DerivedData, and that is the part this speeds up.
+- Changed: reported sizes are now disk usage — the blocks actually allocated —
+  rather than the sum of file lengths. Figures shift in either direction:
+  upward for trees of many small files, but downward — sometimes well below
+  apparent size — for trees affected by APFS transparent compression or
+  sparse files, which includes exactly the DerivedData trees this targets.
+  Hardlinked content counts once, and the number now matches what `df` gives
+  back after a delete.
+
 ## 0.1.1
 
 - Prints scan progress to stderr while a run is in flight, so a scan of a
