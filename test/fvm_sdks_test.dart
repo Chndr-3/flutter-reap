@@ -18,6 +18,11 @@ void main() {
     File(p.join(dir.path, '.fvmrc')).writeAsStringSync('{"flutter": "$version"}');
   }
 
+  void globalDefault(String version) {
+    Link(p.join(home.path, 'fvm', 'default'))
+        .createSync(p.join(home.path, 'fvm', 'versions', version));
+  }
+
   test('returns nothing when fvm is not installed', () {
     expect(fvmSdks(home: home.path), isEmpty);
   });
@@ -140,5 +145,52 @@ void main() {
     final sdk = fvmSdks(home: home.path).single;
     expect(sdk.unused, isFalse);
     expect(sdk.referenceCount, 1);
+  });
+
+  test('an SDK that is only the global default is not reported as unused', () {
+    installSdk('3.38.3');
+    globalDefault('3.38.3');
+    // `fvm global` writes no project config at all, so without the symlink
+    // read this SDK looks unreferenced and gets offered for deletion — an
+    // SDK the user's default `flutter` command resolves through.
+    projectUsing('unrelated_app', '9.9.9');
+
+    final sdk = fvmSdks(home: home.path).single;
+    expect(sdk.unused, isFalse);
+    expect(sdk.isGlobalDefault, isTrue);
+    expect(sdk.referenceCount, 0);
+  }, skip: Platform.isWindows ? 'symlink creation requires privileges on Windows' : null);
+
+  test('the global default does not spare a different SDK', () {
+    installSdk('3.38.3');
+    installSdk('3.44.6');
+    globalDefault('3.38.3');
+    projectUsing('unrelated_app', '9.9.9');
+
+    final sdks = fvmSdks(home: home.path);
+    expect(sdks.firstWhere((s) => s.version == '3.38.3').unused, isFalse);
+    expect(sdks.firstWhere((s) => s.version == '3.44.6').unused, isTrue);
+  }, skip: Platform.isWindows ? 'symlink creation requires privileges on Windows' : null);
+
+  test('a dangling global default link does not throw', () {
+    installSdk('3.38.3');
+    Link(p.join(home.path, 'fvm', 'default'))
+        .createSync(p.join(home.path, 'fvm', 'versions', 'never-installed'));
+    projectUsing('unrelated_app', '9.9.9');
+
+    // The link still resolves to a version name, so nothing throws; the SDK
+    // it names is simply not installed and the real one stays unused.
+    final sdk = fvmSdks(home: home.path).single;
+    expect(sdk.unused, isTrue);
+  }, skip: Platform.isWindows ? 'symlink creation requires privileges on Windows' : null);
+
+  test('a plain directory named default is not read as a global version', () {
+    installSdk('3.38.3');
+    Directory(p.join(home.path, 'fvm', 'default')).createSync();
+    projectUsing('unrelated_app', '9.9.9');
+
+    final sdk = fvmSdks(home: home.path).single;
+    expect(sdk.isGlobalDefault, isFalse);
+    expect(sdk.unused, isTrue);
   });
 }
